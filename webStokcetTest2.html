@@ -1,0 +1,117 @@
+<!--
+ * @Description: 
+ * @Autor: xiaozhilong
+ * @Date: 2020-05-24 17:47:02
+ * @LastEditors: xiaozhilong
+ * @LastEditTime: 2020-05-24 17:47:02
+--> 
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Simple</title>
+    <script type="text/javascript">
+        var url = "ws://127.0.0.1:7181";
+        var ws = null;
+
+        function onLoaded() {
+            debugger
+            if ("WebSocket" in window) {
+                ws = new WebSocket(url);
+            } else if ("MozWebSocket" in window) {
+                ws = new MozWebSocket(url);
+            } else {
+                document.getElementById("message_output").innerHTML = "浏览器不支持WebSocket";
+            }
+
+            ws.onopen = function () {
+                document.getElementById("message_output").innerHTML += "连接服务器成功" + "<br/>";
+            }
+            ws.onclose = function () {
+                document.getElementById("message_output").innerHTML += "与服务器断开连接" + "<br/>";
+            }
+
+            ws.onerror = function () {
+                document.getElementById("message_output").innerHTML += "通信发生错误" + "<br/>";
+            }
+            //     ws.onmessage = function(event) {
+            //         doReceive(event.data)
+            // };
+            ws.onmessage = function (msg) {
+
+                if (msg.data instanceof Blob) {
+                    //服务器端发送的是BinaryMessage
+                    // document.getElementById("message_output").innerHTML += msg.data + "<br/>";
+                    console.log(msg.data);
+                    var reader = new FileReader();
+                    reader.onload = function (event) {
+                        var content = reader.result;//内容就在这里
+                        document.getElementById("message_output").innerHTML += content + "<br/>";
+                    };
+                    var data = reader.readAsText(msg.data);
+                } else {
+                    //服务器端发送的是TextMessage
+                    document.getElementById("message_output").innerHTML += msg.data + "<br/>";
+                }
+            }
+
+        }
+
+        function sendTextMessage() {
+            if (ws) {
+                //此时的ws.binaryType = "blob";
+                ws.send("Hello World!");
+            }
+        }
+
+
+        var receive = [];
+        var length = 0;
+        function doReceive(buffer) {
+            receive = receive.concat(Array.from(new Uint8Array(buffer)));
+            if (receive.length < 4) {
+                return;
+            }
+            length = new DataView(new Uint8Array(receive).buffer).getUint32(0);
+            if (receive.length < length + 4) {
+                return;
+            }
+            var bytes = receive.slice(4, length + 4);
+            doSomething(bytes);
+
+            receive = receive.slice(length + 4);
+        };
+
+        function sendBinaryMessage() {
+            if (ws) {
+                //这个方法有点问题 没办法传大文件 待改善
+                var fileInput = document.getElementById("file_input");
+                if (fileInput.files.length > 0) {
+
+                    var fileReader = new FileReader();
+
+                    fileReader.onloadend = function (e) {
+                        //此时的ws.binaryType="arraybuffer"
+                        ws.send(this.result); //发送读取到的二进制流
+                    }
+                    fileReader.readAsArrayBuffer(fileInput.files[0]);
+                }
+            }
+        }
+    </script>
+</head>
+
+<body onload="onLoaded()">
+    <div>
+        <input type="button" value="SendTextMessage" onclick="sendTextMessage()" />
+    </div>
+    <div>
+        <input type="file" id="file_input" />
+        <input type="button" value="SendBinaryMessage" onclick="sendBinaryMessage()" />
+    </div>
+    <div id="message_output"></div>
+</body>
+
+</html>
